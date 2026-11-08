@@ -19,7 +19,7 @@
 
 ---
 
-> ⚠️ **狀態：Pre-alpha（Phase 2 完成）** 已實作 **Core（含 seed 管理）、Screening** 與 **RSM Design**（CCD、I-optimal / D-optimal、augmentation、線性約束區域、FDS）。其餘階段（Active Learning、RSM 建模、殘差修正、Benchmark、最佳化、敏感度分析）**尚未實作**。下文所有功能皆標示實作狀態，**未標示 ✅ 者都不能使用**；PyPI、CI、Codecov、Docs 徽章在對應服務建立前可能顯示為未知或失敗，屬預期狀態。
+> ⚠️ **狀態：Pre-alpha（Phase 3 完成）** 已實作 **Core（含 seed 管理）、Screening、RSM Design**（CCD、I-optimal / D-optimal、augmentation、線性約束區域、FDS）與 **Active Learning（Module 1）**（GPR、預測 R² 交叉驗證、多響應停止條件、I-optimal augmentation / IVR / Max Variance、批次選點）。其餘階段（RSM 建模、殘差修正、Benchmark、最佳化、敏感度分析）**尚未實作**。下文所有功能皆標示實作狀態，**未標示 ✅ 者都不能使用**；PyPI、CI、Codecov、Docs 徽章在對應服務建立前可能顯示為未知或失敗，屬預期狀態。
 
 ## 📖 簡介
 
@@ -46,7 +46,7 @@ ADoRE-DoE 把「實驗點怎麼選」與「模型怎麼補」整合成單一 Pyt
 | Core | 因子 / 響應 / 資料集結構（多響應共用同一 X）、顯式 seed 管理（root seed＋具名子串流，記錄於 `info`） | ✅ |
 | Screening | Plackett-Burman、Fractional Factorial、主效應 / Pareto / Half-normal | ✅ |
 | RSM 設計 | CCD（face-centered）、I-optimal（主要）、D-optimal（對照）、Augmentation、線性約束區域、FDS plot | ✅ |
-| **Active Learning** | GPR 代理、Max Predictive Variance、IVR、I-optimal Augmentation、批次建議、多響應停止條件 | 📋 |
+| **Active Learning** | GPR 代理、Max Predictive Variance、IVR、I-optimal Augmentation、批次建議、多響應停止條件 | ✅ |
 | RSM 建模 | 一階 / 二階模型、Stepwise、AICc / BIC、Hierarchy 約束、ANOVA、Lack-of-Fit | 📋 |
 | 殘差診斷 | Normal plot、Residual vs Fitted / Order / Factor、Cook's D、Leverage、Box-Cox | 📋 |
 | 統計修正 | 資料轉換、WLS | 📋 |
@@ -134,6 +134,21 @@ design.plot_fds({"CCD": design.fds(d_ccd, seed=1), "I-opt": design.fds(d_i, seed
 ```
 
 範例：[`examples/02_rsm_design.ipynb`](examples/02_rsm_design.ipynb)；規格與限制：[`docs/rsm_design.md`](docs/rsm_design.md)。
+
+**Active Learning（Phase 3）：**
+
+```python
+from adore_doe import active_learning as al
+
+stop = al.MultiResponseStopping(n_max=30, response_min_r2=0.90, aggregate_r2=0.93, batch_size=2)
+L = al.ActiveLearner(ds, ["C", "R"], stop, strategy="ivr", seed=7)   # ds: 已含初始 run 與響應的資料集
+decision = L.assess()                 # GPR + 交叉驗證預測 R² + 停止判斷
+if not decision.stop:
+    sel = L.recommend()               # 只建議，不執行模擬
+    L.update(sel.points, my_simulation(sel.points))
+```
+
+範例：[`examples/03_active_learning.ipynb`](examples/03_active_learning.ipynb)；規格、策略比較結果與限制：[`docs/active_learning.md`](docs/active_learning.md)。
 
 Screening 範例：[`examples/01_screening.ipynb`](examples/01_screening.ipynb)；方法與限制：[`docs/screening.md`](docs/screening.md)。
 
@@ -253,6 +268,7 @@ GA 保留給**最終製程 / 設計參數最佳化**（Desirability、SQP、GA�
 ADoRE-DoE/
 ├── src/adore_doe/
 │   ├── core/            # Factor / Response / ExperimentDataset / Experiment、seed 管理
+│   ├── active_learning/ # GPR、預測 R²、停止條件、acquisition、ActiveLearner
 │   ├── design/          # CCD、I-/D-optimal、augmentation、候選集、約束區域、FDS
 │   ├── screening/       # PB、Fractional Factorial、主效應、limits、篩選、圖表
 │   └── exceptions.py
@@ -270,7 +286,7 @@ src/adore_doe/
 ├── core/              # Factor / Response / Dataset、seed 管理          ← 已實作
 ├── screening/         # PB、Fractional Factorial、主效應分析          ← 已實作
 ├── design/            # CCD、I-/D-optimal、augmentation                ← 已實作
-├── active_learning/   # GPR 代理、acquisition、停止條件
+├── active_learning/   # GPR 代理、acquisition、停止條件                ← 已實作
 ├── rsm/               # 多項式模型、Stepwise、ANOVA、LOF、轉換、WLS
 ├── diagnostics/       # 殘差圖、Leverage、Cook's D、Box-Cox
 ├── residual/          # ML 殘差修正（OOF）
@@ -306,12 +322,12 @@ src/adore_doe/
   - [x] CCD
   - [x] I-optimal（主要）與 D-optimal（對照）
   - [x] Design Augmentation、FDS plot
-- [ ] **v0.3** Module 1：Active Learning ⭐ 最高優先
+- [x] **v0.3** Module 1：Active Learning ⭐ 最高優先
 
-  - [ ] GPR 代理模型
-  - [ ] Acquisition：Max Variance、IVR、I-optimal Augmentation
-  - [ ] 批次建議
-  - [ ] 多響應停止條件
+  - [x] GPR 代理模型
+  - [x] Acquisition：Max Variance、IVR、I-optimal Augmentation
+  - [x] 批次建議
+  - [x] 多響應停止條件
 - [ ] **v0.4** 最終 RSM 建模與診斷
 
   - [ ] 二階模型、Stepwise、AICc / BIC、Hierarchy 約束
@@ -349,6 +365,7 @@ src/adore_doe/
 | [`docs/architecture_core_interfaces.md`](docs/architecture_core_interfaces.md) | 核心介面與 seed 管理（可併入 architecture.md §5） |
 | [`docs/screening.md`](docs/screening.md) | Screening 的 API、統計定義、驗證範圍與限制 |
 | [`docs/rsm_design.md`](docs/rsm_design.md) | RSM Design 的 API、§4.2 規格對照、seed 管理、驗證範圍與限制 |
+| [`docs/active_learning.md`](docs/active_learning.md) | Active Learning 的 API、ADR 對照、acquisition、策略比較實驗（含未達預期的結果）、限制 |
 | [`docs/research_methodology.md`](docs/research_methodology.md) | 數學目標、策略、停止條件、benchmark 方法 |
 | [`docs/development_roadmap.md`](docs/development_roadmap.md) | 階段、依賴、測試、驗收標準 |
 | [`docs/algorithm_decisions.md`](docs/algorithm_decisions.md) | ADR 形式的技術決策 |

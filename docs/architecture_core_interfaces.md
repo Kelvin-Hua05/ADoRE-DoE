@@ -38,3 +38,12 @@
 | 設計資料交接（給 RSM 建模） | 設計函式回傳 `ExperimentDataset`；`info` 含 `design_type`、`model_spec`（`ModelSpec.to_dict()`，可用 `ModelSpec.from_dict` 還原）、`rank`、`cond_X`、`I_criterion` / `logdet_XtX`、`seeds`；`point_type` ∈ {factorial, axial, center, optimal, included, augment}；`source` 記錄 augmentation 來源 |
 | 新例外 | `InfeasibleRegionError(DesignError)`：約束區域為空或可行比例過小 |
 
+## Phase 3 補充：Active Learning 與資料集的交接
+
+| 項目 | 決定 |
+|---|---|
+| 新增 run 的標記 | `source = "AL-iter-<round>"`、`point_type = "active_learning"`、`stage` 遞增；驗證資料用 `source="validation"`，不算訓練資料也不算預算 |
+| 預算計數 | `n_runs` = 訓練 run 數（不含 validation）；另有 `n_unique_points` 與 `n_replicated_runs`；`N_max` 永不超過（最後一批會被縮減） |
+| 歷史紀錄 | `ActiveLearner.history`（每輪：run 數、各響應預測 R² 與狀態、聚合 R²、停止決策、超參數、GPR 擬合資訊、CV 設定、評估集指標、建議點）與 `history_df()` |
+| 獨立性 | `active_learning` 只依賴 `core`、`design`；不得 import `rsm`、`residual`（ADR-005，測試強制） |
+

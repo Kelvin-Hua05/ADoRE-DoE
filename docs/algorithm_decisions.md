@@ -100,6 +100,7 @@
 - **Consequences**：依上述原則，RSM 核心（AICc、hierarchy stepwise）傾向自行實作，並以 `statsmodels` 作對照驗證（待 Phase 1/2 確認）。
 - **Phase 1 結果**：Screening（Plackett-Burman、Fractional Factorial）自行實作（開發環境無 pyDOE3 且無網路）；OLS 以 NumPy 實作，statsmodels 僅作選用的交叉驗證。CCD 的實作方式留待 Phase 2 決定。
 - **Phase 2 結果**：CCD（依 ADR-010：full factorial、face-centered、中心點預設 1 個）、I-optimal / D-optimal（candidate-exchange 啟發式）與 augmentation 皆自行實作；不使用 pyDOE3。
+- **Phase 3 結果**：Active Learning 的 GPR 自行實作（僅用 NumPy / SciPy，不依賴 scikit-learn）；交叉驗證預測 R² 於每折重新最佳化超參數（不 warm-start，避免洩漏）；`active_learning` 不 import `rsm` / `residual`（ADR-005，有測試）。
 - **Open questions**：RSM 建模最終採用方式（Phase 1/2）。
 
 ## ADR-009：預測 R² 的定義與停止條件
