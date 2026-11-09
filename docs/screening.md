@@ -9,7 +9,7 @@
 import adore_doe as ad
 
 factors = [ad.Factor("A", 0.1, 0.3, unit="g"), ad.Factor("B", 10, 20), ad.Factor("C", 1, 5)]
-design  = ad.screening.plackett_burman(factors, runs=8, center_points=3, randomize=True, seed=1)
+design  = ad.screening.plackett_burman(factors, runs=8, center_points=1, randomize=True, seed=1)
 design.to_csv("design.csv")                       # 依 RunOrder 輸出；首行為可還原的 metadata
 design.add_response("Yield", values, order="run") # order="std"(預設) 或 "run"（依實驗執行順序填）
 effects   = ad.screening.main_effects(design, response="Yield", alpha=0.05)
