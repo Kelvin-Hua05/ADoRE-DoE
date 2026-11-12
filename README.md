@@ -19,7 +19,7 @@
 
 ---
 
-> ⚠️ **狀態：Pre-alpha（Phase 3 完成）** 已實作 **Core（含 seed 管理）、Screening、RSM Design**（CCD、I-optimal / D-optimal、augmentation、線性約束區域、FDS）與 **Active Learning（Module 1）**（GPR、預測 R² 交叉驗證、多響應停止條件、I-optimal augmentation / IVR / Max Variance、批次選點）。其餘階段（RSM 建模、殘差修正、Benchmark、最佳化、敏感度分析）**尚未實作**。下文所有功能皆標示實作狀態，**未標示 ✅ 者都不能使用**；PyPI、CI、Codecov、Docs 徽章在對應服務建立前可能顯示為未知或失敗，屬預期狀態。
+> ⚠️ **狀態：Pre-alpha（Phase 5 完成）** 已實作 **Core（含 seed 管理）、Screening、RSM Design、Active Learning（Module 1）、RSM 建模與診斷**（多項式 OLS、ANOVA / Lack-of-Fit、Stepwise / AICc / BIC、hierarchy、診斷）與 **ML 殘差修正（Module 2）**（OOF 殘差、GP / MLP / SVR、不修正回退）。其餘階段（Benchmark、最佳化、敏感度分析）**尚未實作**；資料轉換 / WLS / Box-Cox 與 Random Forest 殘差模型依 Roadmap / ADR-011 延後。下文所有功能皆標示實作狀態，**未標示 ✅ 者都不能使用**；PyPI、CI、Codecov、Docs 徽章在對應服務建立前可能顯示為未知或失敗，屬預期狀態。
 
 ## 📖 簡介
 
@@ -47,10 +47,10 @@ ADoRE-DoE 把「實驗點怎麼選」與「模型怎麼補」整合成單一 Pyt
 | Screening | Plackett-Burman、Fractional Factorial、主效應 / Pareto / Half-normal | ✅ |
 | RSM 設計 | CCD（face-centered）、I-optimal（主要）、D-optimal（對照）、Augmentation、線性約束區域、FDS plot | ✅ |
 | **Active Learning** | GPR 代理、Max Predictive Variance、IVR、I-optimal Augmentation、批次建議、多響應停止條件 | ✅ |
-| RSM 建模 | 一階 / 二階模型、Stepwise、AICc / BIC、Hierarchy 約束、ANOVA、Lack-of-Fit | 📋 |
-| 殘差診斷 | Normal plot、Residual vs Fitted / Order / Factor、Cook's D、Leverage、Box-Cox | 📋 |
+| RSM 建模 | 一階 / 二階模型、Stepwise、AICc / BIC、Hierarchy 約束、ANOVA、Lack-of-Fit | ✅ |
+| 殘差診斷 | Normal plot、Residual vs Predicted / Run / Factor、Cook's D、Leverage、DFFITS（Box-Cox 延後） | ✅ |
 | 統計修正 | 資料轉換、WLS | 📋 |
-| **ML 殘差修正** | GPR / ANN / Random Forest / SVR、OOF 殘差、獨立驗證集評估 | 📋 |
+| **ML 殘差修正** | GP / ANN（MLP）/ SVR（RF 依 ADR-011 延後）、OOF 殘差、「不修正」回退、獨立驗證集評估 | ✅ |
 | **Benchmark** | 四組比較（固定 run 預算 / 目標準確度）、多種子重複 | 📋 |
 | 最佳化 | Desirability、SQP、GA、NSGA-II、外插警告 | 📋 |
 | 敏感度分析 | Perturbation、Tornado、Sobol、Morris、Monte Carlo | 📋 |
@@ -150,6 +150,20 @@ if not decision.stop:
 
 範例：[`examples/03_active_learning.ipynb`](examples/03_active_learning.ipynb)；規格、策略比較結果與限制：[`docs/active_learning.md`](docs/active_learning.md)。
 
+**RSM 建模與診斷（Phase 4）／ML 殘差修正（Phase 5）：**
+
+```python
+from adore_doe import rsm, residual
+
+res = rsm.fit(ds, "C", model="quadratic", selection={"method": "stepwise", "criterion": "p"})
+res.anova(); res.fit_statistics(); print(res.equation(coded=False)); res.diagnostics().summary()
+
+h = residual.fit(ds, "C", seed=7)             # y_RSM + lambda * e_ML，殘差目標為 out-of-fold
+h.report; h.evaluate(Z_val, y_val)             # 一律用獨立驗證資料評估
+```
+
+範例：[`examples/04_rsm_modeling.ipynb`](examples/04_rsm_modeling.ipynb)、[`examples/05_residual_correction.ipynb`](examples/05_residual_correction.ipynb)；規格與限制：[`docs/rsm.md`](docs/rsm.md)、[`docs/residual.md`](docs/residual.md)。
+
 Screening 範例：[`examples/01_screening.ipynb`](examples/01_screening.ipynb)；方法與限制：[`docs/screening.md`](docs/screening.md)。
 
 **以下為概念性流程（pseudocode），Phase 2 以後的呼叫都尚未實作，僅用於說明預期用法：**
@@ -235,7 +249,7 @@ pipe.report("report.html")
 
 所有響應共用同一組實驗點，但**各自建模、各自評估**。停止需**同時**滿足：
 
-- 每個響應的個別最小預測 R²（例：各 ≥ 0.95），**且**
+- 每個響應的個別最小預測 R²（例：各 ≥ 0.90），**且**
 - 聚合預測 R²（平均或加權平均，例：≥ 0.95），
 
 或達到最大 run 預算（此時必須標示「目標未達成」）。訓練 R² 不得作為唯一停止依據；負的 R² 必須保留；無法計算時回報原因並視為未達標。
@@ -269,6 +283,9 @@ ADoRE-DoE/
 ├── src/adore_doe/
 │   ├── core/            # Factor / Response / ExperimentDataset / Experiment、seed 管理
 │   ├── active_learning/ # GPR、預測 R²、停止條件、acquisition、ActiveLearner
+│   ├── rsm/             # 多項式 OLS、ANOVA / LOF、Stepwise、方程式
+│   ├── diagnostics/     # 殘差 / 影響力診斷與圖
+│   ├── residual/        # OOF 殘差、GP / MLP / SVR、混合模型
 │   ├── design/          # CCD、I-/D-optimal、augmentation、候選集、約束區域、FDS
 │   ├── screening/       # PB、Fractional Factorial、主效應、limits、篩選、圖表
 │   └── exceptions.py
@@ -287,9 +304,9 @@ src/adore_doe/
 ├── screening/         # PB、Fractional Factorial、主效應分析          ← 已實作
 ├── design/            # CCD、I-/D-optimal、augmentation                ← 已實作
 ├── active_learning/   # GPR 代理、acquisition、停止條件                ← 已實作
-├── rsm/               # 多項式模型、Stepwise、ANOVA、LOF、轉換、WLS
-├── diagnostics/       # 殘差圖、Leverage、Cook's D、Box-Cox
-├── residual/          # ML 殘差修正（OOF）
+├── rsm/               # 多項式模型、Stepwise、ANOVA、LOF（轉換、WLS 延後）   ← 已實作
+├── diagnostics/       # 殘差圖、Leverage、Cook's D（Box-Cox 延後）            ← 已實作
+├── residual/          # ML 殘差修正（OOF）                                    ← 已實作
 ├── benchmark/         # 四組比較
 ├── optimize/          # Desirability、SQP、GA、NSGA-II
 ├── sensitivity/       # Perturbation、Tornado、Sobol、Morris、Monte Carlo
@@ -330,14 +347,15 @@ src/adore_doe/
   - [x] 多響應停止條件
 - [ ] **v0.4** 最終 RSM 建模與診斷
 
-  - [ ] 二階模型、Stepwise、AICc / BIC、Hierarchy 約束
-  - [ ] ANOVA、Lack-of-Fit
-  - [ ] 殘差診斷全套 + 轉換 / WLS
-- [ ] **v0.5** Module 2：ML 殘差修正
+  - [x] 二階模型、Stepwise、AICc / BIC、Hierarchy 約束
+  - [x] ANOVA、Lack-of-Fit
+  - [x] 殘差診斷（Normal plot、Leverage、Cook's D、DFFITS …）
+  - [ ] 轉換 / WLS / Box-Cox（Roadmap §4 延後項目，未實作；因此 v0.4 本身不勾選）
+- [x] **v0.5** Module 2：ML 殘差修正
 
-  - [ ] OOF 殘差建立
-  - [ ] GPR / ANN / RF / SVR 候選模型
-  - [ ] 獨立驗證集評估
+  - [x] OOF 殘差建立
+  - [x] GP / ANN（MLP）/ SVR 候選模型（RF 依 ADR-011 延後）
+  - [x] 獨立驗證集評估
 - [ ] **v0.6** 四組研究 Benchmark ⭐ 最高優先
 
   - [ ] 固定 run 預算比較
@@ -365,6 +383,8 @@ src/adore_doe/
 | [`docs/architecture_core_interfaces.md`](docs/architecture_core_interfaces.md) | 核心介面與 seed 管理（可併入 architecture.md §5） |
 | [`docs/screening.md`](docs/screening.md) | Screening 的 API、統計定義、驗證範圍與限制 |
 | [`docs/rsm_design.md`](docs/rsm_design.md) | RSM Design 的 API、§4.2 規格對照、seed 管理、驗證範圍與限制 |
+| [`docs/rsm.md`](docs/rsm.md) | RSM 建模的公式、ANOVA / LOF、選項與 hierarchy、診斷、教科書對照與限制 |
+| [`docs/residual.md`](docs/residual.md) | 殘差修正的方法、20-seed 驗證實驗（含未達預期的結果）與限制 |
 | [`docs/active_learning.md`](docs/active_learning.md) | Active Learning 的 API、ADR 對照、acquisition、策略比較實驗（含未達預期的結果）、限制 |
 | [`docs/research_methodology.md`](docs/research_methodology.md) | 數學目標、策略、停止條件、benchmark 方法 |
 | [`docs/development_roadmap.md`](docs/development_roadmap.md) | 階段、依賴、測試、驗收標準 |

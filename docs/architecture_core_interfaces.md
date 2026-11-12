@@ -47,3 +47,13 @@
 | 歷史紀錄 | `ActiveLearner.history`（每輪：run 數、各響應預測 R² 與狀態、聚合 R²、停止決策、超參數、GPR 擬合資訊、CV 設定、評估集指標、建議點）與 `history_df()` |
 | 獨立性 | `active_learning` 只依賴 `core`、`design`；不得 import `rsm`、`residual`（ADR-005，測試強制） |
 
+## Phase 4/5 補充：RSM 與殘差修正的交接
+
+| 項目 | 決定 |
+|---|---|
+| RSM 輸入 | 設計資料集（`ExperimentDataset`）：`rsm.fit(ds, response, ...)` 只用 `training_mask` 內、該響應已量測的 run；validation 永不參與 |
+| `RSMResult` | `terms`（指數 tuple）、`beta`、`se`/`t`/`p`/`ci`、`vif`、`leverage`、`resid`、`predict(Z, return_se)`、`equation(coded)`、`anova()`、`diagnostics()`、`selection`（選項紀錄）、`factors`、`run_order` |
+| 殘差修正輸入 | 同一份資料集；`residual.fit(ds, response, ...)` 回傳 `HybridModel`（`base: RSMResult`、`learner`、`lam`、`report`、`oof`、`config`），`predict` / `predict_rsm` / `evaluate` |
+| 模組依賴 | `rsm`、`diagnostics` 只依賴 `core`、`design`；`residual` 依賴 `core`、`rsm`；`active_learning` 與 `residual` 互不 import（ADR-005，測試強制） |
+| 隨機性 | OOF 折、學習器與內層 CV 的 seed 由 `SeedManager` 分流並記錄在 `HybridModel.config["seeds"]` |
+
